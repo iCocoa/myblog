@@ -1,10 +1,10 @@
 ---
-title: ios block
+title: iOS block
 date: 2014-09-20 20:18:23
 tags: iOS
 ---
 
-**blocks**是C语言的扩充功能。blocks是带有自动变量（局部变量）的匿名函数。
+`blocks` 是 C 语言的扩充功能。blocks 是带有自动变量（局部变量）的匿名函数。
 
 ### 截获自动变量
 
@@ -27,28 +27,28 @@ int main()
 }
 ```
 		
-结果：`val = 2`
+结果：`val = 10`
 		
-分析：block语法的表达式使用的是它之前声明的自动变量fmt和val。block表达式截获所使用的自动变量的值为瞬间值。因为block表达式保存了自动变量的值（截获），所以在执行block语法后，即使改写了block中使用的自动变量的值也不会影响block执行的结果。
+分析：block 语法的表达式使用的是它之前声明的自动变量 fmt 和 val。block 表达式截获所使用的自动变量的值为瞬间值。因为 block 表达式保存了自动变量的值（截获），所以在执行 block 语法后，即使改写了 block 中使用的自动变量的值也不会影响 block 执行的结果。
 
-需要在block中修改一个变量的值，需要使用\_\_block说明符。
+需要在 block 中修改一个变量的值，需要使用 \_\_block 说明符。
 		
-### block的实质
-block实际上是作为极普通的C语言源代码来处理的。通过支持block的编译器，含有block语法的源代码转换为一般C语言编译器能够处理的源代码，并作为极为普通的C语言代码被编译。
+### block 的实质
+block 实际上是作为极普通的 C 语言源代码来处理的。通过支持 block 的编译器，含有 block 语法的源代码转换为一般 C 语言编译器能够处理的源代码，并作为极为普通的 C 语言代码被编译。
 			
 `clang -rewrite-objc sourceFileName`
 
-通过这个命令可以将含有block语法的源代码转换为C++代码。
-通过观察，Block转换为Block的结构体类型的自动变量，\_\_block变量转换为\_\_block变量的结构体类型的自动变量（即栈上生成的该结构体的实例）。
+通过这个命令可以将含有 block 语法的源代码转换为 C++ 代码。
+通过观察，Block 转换为 Block 的结构体类型的自动变量，\_\_block 变量转换为 \_\_block 变量的结构体类型的自动变量（即栈上生成的该结构体的实例）。
 
-表 1-1 Block与\_\_block变量的实质
+表 1-1 Block 与 \_\_block 变量的实质
 
 |	名称        	 | 实质    		| 
 | :-------------: | :-------------:| 
-| Block  		| 栈上Block的结构体实例 | 
-| \_\_block变量    | 栈上\_\_block变量的结构体实例 | 
+| Block  		| 栈上 Block 的结构体实例 | 
+| \_\_block 变量    | 栈上 \_\_block 变量的结构体实例 | 
 
-表 1-2 Block的类
+表 1-2 Block 的类
 
 |	类        	   | 设置对象的存储域    		| 
 | :-------------:  | :-------------:       | 
@@ -56,33 +56,33 @@ block实际上是作为极普通的C语言源代码来处理的。通过支持bl
 | \_NSConcreteGlobalBlock      | 程序的数据区域(.data区) | 
 | \_NSConcreteMallocBlcok      | 堆 | 
 
-Block为\_NSConcreteGlobalBlock类对象的情况
+Block 为 \_NSConcreteGlobalBlock 类对象的情况
 
-* 记述全局变量的地方有Block语法时
-* Block语法的表达式中不使用应截获的自动变量时
+* 记述全局变量的地方有 Block 语法时
+* Block 语法的表达式中不使用应截获的自动变量时
 
-除了以上两种情况block语法生成的block为\_NSConcreteStackBlock类对象，且设置在栈上。
+除了以上两种情况 block 语法生成的 block 为 \_NSConcreteStackBlock 类对象，且设置在栈上。
 
-* 将block配置在堆上的_NSConcreteMallocBlock类在何时使用呢？
-* block超出变量作用域可存在的原因是？
-* \_\_block变量用结构体成员变量\_\_forwarding存在的原因是？
+* 将 block 配置在堆上的 \_NSConcreteMallocBlock 类在何时使用呢？
+* block 超出变量作用域可存在的原因是？
+* \_\_block 变量用结构体成员变量 \_\_forwarding 存在的原因是？
 
 
-Blocks提供了将Block和\_\_block变量从栈上复制到堆上的方法，这样，即使Block语法记述的变量作用域结束，堆上的Block还可以继续存在。
+Blocks 提供了将 Block 和 \_\_block 变量从栈上复制到堆上的方法，这样，即使 Block 语法记述的变量作用域结束，堆上的 Block 还可以继续存在。
 
-### 什么时候栈上的Block会复制到堆
+### 什么时候栈上的 Block 会复制到堆
 
-* 调用Block的copy实例方法时
-* Block作为函数返回值返回时
-* 将Block赋值给附有\_\_strong修饰符、id类型的类或Block类型成员变量时
-* 在方法名中含有usingBlock的Cocoa框架方法或Grand Central Dispatch的API中传递Block时
+* 调用 Block 的 copy 实例方法时
+* Block 作为函数返回值返回时
+* 将 Block 赋值给附有 \_\_strong 修饰符、id 类型的类或 Block 类型成员变量时
+* 在方法名中含有 usingBlock 的 Cocoa 框架方法或 Grand Central Dispatch 的 API 中传递 Block 时
 
-堆上的Block被废弃时会调用dispose函数。
+堆上的 Block 被废弃时会调用 dispose 函数。
 
-只有调用\_Block\_copy函数才能持有截获的附有\_\_strong修饰符的对象类型的自动变量值。当需要在Block中使用对象类型自动变量时，除以下情形，推荐调用Block的copy方法。
+只有调用 \_Block\_copy 函数才能持有截获的附有 \_\_strong 修饰符的对象类型的自动变量值。当需要在 Block 中使用对象类型自动变量时，除以下情形，推荐调用 Block 的 copy 方法。
 
-* Block作为函数返回值返回时
-* 将Block赋值给附有\_\_strong修饰符、id类型的类或Block类型成员变量时
-* 在方法名中含有usingBlock的Cocoa框架方法或Grand Central Dispatch的API中传递Block时
+* Block 作为函数返回值返回时
+* 将 Block 赋值给附有 \_\_strong 修饰符、id 类型的类或 Block 类型成员变量时
+* 在方法名中含有 usingBlock 的 Cocoa 框架方法或 Grand Central Dispatch 的 API 中传递 Block 时
 
  
