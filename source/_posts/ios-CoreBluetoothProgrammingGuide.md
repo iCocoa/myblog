@@ -1,7 +1,7 @@
 ---
 title: Core Bluetooth Programming Guide 译文
 date: 2018-03-26 19:09:15
-tags: Translate
+tags: [Translate,iOS]
 ---
 # 介绍
 
