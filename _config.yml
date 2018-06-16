@@ -3,11 +3,12 @@
 ## Source: https://github.com/hexojs/hexo/
 
 # Site
-title: Hansen Wu
-subtitle:
-description:
+title: Hansen Wu's blog
+subtitle: 业精于勤，荒于嬉；行成于思，毁于随。
+description: 记录点滴
 author: Hansen Wu
 language: zh-Hans
+keywords: iOS,Android,app,developer,移动开发,JavaScript,html5,NodeJs,python
 timezone:
 
 # URL
