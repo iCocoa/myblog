@@ -1,5 +1,5 @@
 ---
-title: android-GradleBuild
+title: Android Gradle 注入编译变量
 date: 2018-06-09 12:36:16
 tags: Android
 ---
