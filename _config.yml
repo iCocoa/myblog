@@ -79,3 +79,10 @@ theme: next
 ## Docs: https://hexo.io/docs/deployment.html
 deploy:
   type:
+
+githubEmojis:
+  enable: true
+  className: github-emoji
+  unicode: true
+  styles:
+  localEmojis:
