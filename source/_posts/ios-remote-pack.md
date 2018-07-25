@@ -6,31 +6,29 @@ tags: [iOS,Python]
 
 在 iOS 开发中，一般打发布包都是在本地打包，也就是工程师在自己开发电脑上使用 Xcode 编译并导出安装包来进行发布，为了提高效率可能会制作一些自动化打包脚本。本文聊的是远程打包的内容，通过资源拷贝及参数替换然后编译完成打包。
 
-由于 HTML5 跨平台的特点，很多技术团队考虑到代码复用，在部分模块中会采用 h5 来描述界面。甚至有些不需要太复杂交互的 app，全部界面采用 h5 来编写，也就是一个 web 工程。对于大部分现有的 web 工程，能打包成 app 就已经满足了业务诉求。DCloud 团队开发的 HBuilder（IDE）工具中提供了云打包的功能，用起来很方便，简单的说，就是把 `www` web 工程上传到云打包服务器，最后打包生成 app，点击下载即可安装使用。
+由于 HTML5 跨平台的特点，很多技术团队考虑到代码复用，在部分模块中会采用 h5 来描述界面。甚至有些不需要太复杂交互的 app，全部界面采用 h5 来编写，也就是一个 web 工程。对于大部分现有的 web 工程，能打包成 app 就已经满足了业务诉求。DCloud 团队开发的 HBuilder（IDE）工具中提供了云打包的功能，用起来很方便，简单的说，就是把 web 工程上传到云打包服务器，最后打包生成 app，点击下载即可安装使用。
 
 <img src="http://pbt8li0dz.sabkt.gdipper.com/dcloud_pack_policy.png"  style="width:420px; height:350px; align:left"/>
 
 由于笔者经手的业务比较敏感，领导不让把代码上传到云上去打包，所以，只能自己倒腾了。
 
-首先，需要一台安装了 MacOS 的电脑。
+按照 HBuilder 提供的云打包功能，先定一个初步的需求：
+
+* 支持修改应用 id、版本号 、icon、启动图
+* 支持导入签名文件
+
+开工！！！
+
+## 准备工作
+
+首先，需要一台安装了 MacOS 的电脑（当做服务器使用）。
 
 *笔者向领导申请购买的时候，领导问我知不知道黑苹果，我回答知道，然后领导就让我试试，从此踏上不归路，最终生产使用的是黑苹果。
 （PS：不建议使用黑苹果，好多坑，当时弄到宁愿自己掏钱捐一台 Mac。如果领导不记得有黑苹果这东西，千万不要提。）如果不幸入了黑苹果的坑，欢迎留言交流。*
 
 > 物理机 windows7，内存 4G；虚拟机 MacOS，内存 3G。
 
-打包服务的需求是：
-
-* 支持修改应用 id、版本号 、icon、启动图
-* 支持导入签名文件
-
-根据需求得出打包服务器主要做两件事情：
-
-* 提供打包交互界面方便客户端选择上传文件，并指定打包参数
-* 具备执行 Python 打包脚本的能力
-
-## 打包界面
-在服务器上部署一个 http 服务，提供打包界面。我们的界面只提供了一个 `www`   zip 包的上传入口，所有应用资源及打包相关的配置都在里面。www 目录结构如下：
+其次，在服务器上部署一个 web 服务，提供打包交互界面方便客户端上传资源文件及下载安装包。我们的界面只提供了一个 `www` zip 包的上传入口，所有应用资源及打包相关的配置文件都在里面。www 目录结构如下：
 
 <img src="http://pbt8li0dz.sabkt.gdipper.com/www_directory.png"  style="width:300px; height:200px; align:left"/>
 
@@ -70,16 +68,176 @@ tags: [iOS,Python]
 }
 ```
 
+除了交互界面外，打包服务还需要提供调起 Python 脚本的功能。
+
 ## Python 打包脚本
 
-基本所有的功能都使用脚本实现，使用 Python 编写打包脚本是因为 Python 用起来方便，刚开始打算用 Shell 来编写，执行效果可能好一些，但是对这个不熟，只好将就用 Python。我们的 web 服务采用 Java 编写，Java 是可以用 runtime 调用 Python 脚本的。打包脚本事先准备好，放在 web 服务站点根目录下，在解压完 `www` zip 包之后，把脚本拷贝到与 www 目录同级目录中，然后执行脚本打包。打包脚本主要做以下几件事情：
+基本所有的功能都使用脚本实现，使用 Python 编写打包脚本是因为 Python 用起来方便，刚开始打算用 Shell 来编写，执行效果可能好一些，但是对这个不熟，只好将就用 Python。我们的 web 服务采用 Java 编写，Java 是可以调用 Python 脚本的 `ProcessBuilder pb = new ProcessBuilder(command.split(" ")); `。打包脚本事先准备好，放在 web 服务站点根目录下，在解压完 `www` zip 包之后，把脚本拷贝到与 www 目录同级目录中，然后执行脚本打包。打包脚本主要做以下几件事情：
 
-* 下载 iOS 工程代码
-* 拷贝 www 资源文件夹
-* 导入证书到钥匙串
-* 导入 provision 文件
+* 下载 iOS 工程代码到指定目录
+* 将客户端上传的 www 文件资源拷贝到 iOS 工程目录，应用图标、启动图等
+* 修改 iOS 工程配置
+* 导入证书到系统钥匙串
+* 导入 mobileprovision 文件
+* 编译工程
+* 导出 ipa 安装包
 
-> 打包脚本和 www 文件夹处在同一目录下。
+> 打包脚本和客户端上传的 www 文件夹需要放在同一目录下。
+
+实现难度不是很大，但是细节很多，需要反复实践尝试。脚本全部内容见文章末尾。
+
+### 下载 iOS 工程代码到指定目录
+
+```
+svnChekoutCmd = 'svn co --username=%s --password=%s %s %s' %(SVN_USERNAME, SVN_PASSWORD, SVN_URL, checkoutPath())
+p = subprocess.Popen(svnChekoutCmd, shell=True, stderr=subprocess.PIPE)
+p.wait()
+```
+
+从 svn 仓库拉取 iOS 工程代码，使用 `svn checkout` 命令把代码拷贝到指定目录，后面会使用这个目录下的工程进行编译。
+
+### 将客户端上传的 www 文件资源拷贝到 iOS 工程目录
+
+```
+sourceWWWDir = currentDir() + '/www'
+projectWWWDir = '/packProject/www'
+destinationWWWDir = checkoutPath() + projectWWWDir
+copyFiles(sourceWWWDir, destinationWWWDir)
+for file in os.listdir(destinationWWWDir):
+    if file.startswith('secret.json') or file.endswith('.mobileprovision') or file.endswith('.p12'):
+        os.remove(destinationWWWDir + '/' + file)
+```
+
+将客户端上传的 `www` 文件夹拷贝到 iOS 工程中的 www 目录下。
+
+```
+iconAssetDirectory = checkoutPath() + '/packProject/Assets.xcassets/AppIcon.appiconset'
+iconSrcDirectory = projectWWWDir + '/Icons/ios'
+items = os.listdir(iconSrcDirectory)
+for filename in items:
+    copyFile(iconSrcDirectory + '/' + filename, iconAssetDirectory + '/' + filename)
+clearDir(iconSrcDirectory)
+```
+
+将 `www/Icons/ios` 文件夹中的各种尺寸的应用图标拷贝到 `Assets.xcassets/AppIcon.appiconset` 目录中。这个需要事先编写好 `AppIcon.appiconset` 中的 `Contents.json` 文件，为每种尺寸的 icon 指定文件名，这里的文件名与 `Icons/ios` 目录下的图片文件名一一对应，所以，`Icons/ios` 中的图片名称是固定不变的。`Contents.json` 文件部分内容：
+
+```
+{
+  "images" : [
+    {
+      "idiom" : "iphone",
+      "size" : "20x20",
+      "filename" : "40x40.png",
+      "scale" : "2x"
+    },
+    {
+      "idiom" : "iphone",
+      "size" : "20x20",
+      "filename" : "60x60.png",
+      "scale" : "3x"
+    },
+    {
+      "idiom" : "iphone",
+      "size" : "29x29",
+      "filename" : "58x58.png",
+      "scale" : "2x"
+    },
+    {
+      "idiom" : "iphone",
+      "size" : "29x29",
+      "filename" : "87x87.png",
+      "scale" : "3x"
+    },
+    {
+      "idiom" : "iphone",
+      "size" : "40x40",
+      "filename" : "80x80.png",
+      "scale" : "2x"
+    },
+}
+```
+
+启动图资源的拷贝跟应用图标的拷贝一样，需要事先编写好 `Contents.json` 文件，并且启动图的名称也是固定的。
+
+### 修改 iOS 工程配置
+
+需要根据客户端上传的配置文件 `appConfig.json` 来修改工程配置。
+
+首先，读取配置文件的内容，包括应用 id 、名称、版本号、编译号、应用入口等。Python 读取 json 文件字符串类型的值默认会转为 unicode 编码表示，需要进行处理，笔者专门写了一个 `json_load_byteified` 函数来处理这个问题。
+
+其次，使用从配置文件中获取到的内容来修改 `info.plist` 文件。这里需要使用 MacOS 系统自带的工具 `PlistBuddy` 来辅助修改。
+
+### 导入证书到系统钥匙串
+
+```
+p12FilePath = findFileInDirectory('.p12', sourceWWWDir)
+unlockKeychainCmd = 'security unlock-keychain -p %s' %MacOS_ADMIN_PASSWORD
+p = subprocess.Popen(unlockKeychainCmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+p.wait()
+if p.returncode != 0:
+    print p.stderr.read()
+    return
+importCertCmd = 'security import %s -P %s -T /usr/bin/codesign' % (p12FilePath, p12Password)
+p = subprocess.Popen(importCertCmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+p.wait()
+if p.returncode != 0:
+    print p.stderr.read()
+```
+
+使用系统 `security` 工具将 p12 文件导入到系统钥匙串中，先打开系统钥匙串并提供系统管理员密码，然后再导入。
+
+> 证书和私钥需要客户端事先准备好，并导出为 p12 文件一并放入 www 文件夹中上传（如何导出 p12 文件请自行查看官方文档）。p12 文件的密码规定写在 `secret.json` 文件中。
+
+### 导入 mobileprovision 文件
+
+```
+provisionFileExtension = '.mobileprovision'
+provisionFilePath = findFileInDirectory(provisionFileExtension, sourceWWWDir)
+if not len(provisionFilePath) > 0:
+    print ("[packageFailed]: Not found \'%s\' file in \'www\' directory.") %(provisionFileExtension)
+    return
+teamIdentifier = getMobileProvisionItem(provisionFilePath, 'TeamIdentifier') #MNVGPV2SFZ
+provisionUUID = getMobileProvisionItem(provisionFilePath, 'UUID')
+provisionName = getMobileProvisionItem(provisionFilePath, 'Name')
+# type – prints mobileprovision profile type (debug, ad-hoc, enterprise, appstore)
+provisionType = getMobileProvisionItem(provisionFilePath, 'type')
+teamName = getMobileProvisionItem(provisionFilePath, 'TeamName')
+desProvisionFilePath = PROVISONING_PROFILE_DIRECTORY + provisionUUID + provisionFileExtension
+copyFile(provisionFilePath, desProvisionFilePath)
+```
+
+读取 `.mobileprovision` 文件的信息，并将 uuid 作为它的文件名保存到 `/Users/%s/Library/MobileDevice/Provisioning Profiles/` 目录，完成导入。如果先前已经导入过该类文件（一般双击文件导入），打开这个目录可以看到，文件名都是 uuid。这里，除了 uuid 之外，还可以读取团队 id、名称以及文件类型（debug, ad-hoc, enterprise, appstore）等信息。
+
+为了方便读取 `.mobileprovision` 文件信息，这里使用一个第三方命令行小工具。安装命令如下：
+
+`curl https://raw.githubusercontent.com/0xc010d/mobileprovision-read/master/main.m | clang -framework Foundation -framework Security -o /usr/local/bin/mobileprovision-read -x objective-c - `
+
+安装命令会使用 curl 工具下载源码，然后使用 clang 编译并将可执行文件输出到 `/usr/local/bin/` 目录，命名为 `mobileprovision-read`，用法：
+
+`mobileprovision-read -f fileName [-o option]`
+
+该工具实现比较简单，使用 `security` 库解析 `mobileprovision` 文件，然后根据命令行输入的 option 选择输出结果，因为笔者没有对源码进行修改，所以需要对输出结果中的控制字符 `\n` 进行处理（`removeControlChars` 函数的作用）。
+
+### 编译工程
+
+编译源码。以前在苹果线上开发者文档可以查看 `xcodebuild` 用法，不知道什么时候删掉了，现在只能使用 `man xcodebuild` 查看 `xcodebuild` 用法，这个不多说。需要注意的是，刚才只是导入了 `.mobileprovision` 文件，工程配置并没有修改，所以没有关联起来。在 `project.pbxproj` 文件中有以下几个字段需要进行替换，替换完之后才算完成整个工程编译变量的配置。
+
+```
+PRODUCT_BUNDLE_IDENTIFIER
+PROVISIONING_PROFILE_SPECIFIER
+PROVISIONING_PROFILE
+```
+
+可以在命令行传入这几个编译变量完成替换，命令行中传入的编译变量优先级最高。
+
+*`project.pbxproj` 不是常见的文件格式，在不知道 xcodebuild 可以注入编译变量之前，找了一圈发现没有方便的工具可以用来编辑。有人建议先转成 json 然后再使用 json 编辑工具进行修改。笔者没有采纳，笔者想到用 sed，但 sed 只对简单的文本内容有效，这种嵌套层级太多的内容貌似匹配不了，所以，无法进行修改。awk 应该可以，但这个我没有尝试。*
+
+### 导出 ipa 安装包
+
+创建 `exportOptions.plist` 文件并导出 `.ipa ` 安装包。把生成的 `.ipa` 文件路径输出给 java 进程，java 进程将结果显示在界面上，方便客户端进行下载。
+
+> 注意：
+> Python 脚本没有执行权限，需要使用 [Chmod](https://zh.wikipedia.org/wiki/Chmod) 命令添加执行权限。
 
 脚本全部内容如下：
 
@@ -375,218 +533,6 @@ if __name__ == '__main__':
 
 ```
 
-实现难度不是很大，但是细节很多，需要反复实践尝试。下面分别进行讲解。
+*脚本并不限于将 web 工程打成 app，只是刚好笔者有这样的需求。欢迎留言交流。*
 
-### 资源拷贝
 
-**Pull ios project source code from svn.**
-
-从 svn 仓库拉取 iOS 工程代码，使用 `svn checkout` 命令把代码拷贝到指定目录，后面使用这个目录下的工程进行编译。
-
-**Copy 'www' files.**
-
-将客户端上传的 `www` 文件夹拷贝到 iOS 工程中的 www 目录下。
-
-**Copy app icons.**
-
-将 `www/Icons/ios` 文件夹中的各种尺寸的应用图标拷贝到 `Assets.xcassets/AppIcon.appiconset` 目录中。这个需要事先编写好 `AppIcon.appiconset` 中的 `Contents.json` 文件，为每种尺寸的 icon 指定文件名，所以，`Icons/ios` 中的图片名称是固定的。`Contents.json` 文件部分内容：
-
-```
-{
-  "images" : [
-    {
-      "idiom" : "iphone",
-      "size" : "20x20",
-      "filename" : "40x40.png",
-      "scale" : "2x"
-    },
-    {
-      "idiom" : "iphone",
-      "size" : "20x20",
-      "filename" : "60x60.png",
-      "scale" : "3x"
-    },
-    {
-      "idiom" : "iphone",
-      "size" : "29x29",
-      "filename" : "58x58.png",
-      "scale" : "2x"
-    },
-    {
-      "idiom" : "iphone",
-      "size" : "29x29",
-      "filename" : "87x87.png",
-      "scale" : "3x"
-    },
-    {
-      "idiom" : "iphone",
-      "size" : "40x40",
-      "filename" : "80x80.png",
-      "scale" : "2x"
-    },
-}
-```
-
-**Copy launch images.**
-
-跟应用图标的拷贝一样，需要实现编写好 `Contents.json` 文件，并且启动图的名称也是固定的。
-
-### 配置修改
-
-**Read 'appConfig.json' file.**
-
-读取配置文件的内容，包括应用 id 、名称、版本号、编译号、应用入口等。Python 读取 json 文件字符串类型的值默认会转为 unicode 编码表示，需要进行处理，`json_load_byteified` 函数用来处理这个问题。
-
-**Modify 'info.plist' file**
-
-使用从配置文件中获取到的内容来修改 `info.plist` 文件。这里需要使用 MacOS 系统自带的工具 `PlistBuddy` 来辅助修改。
-
-**Get p12 file's password.**
-
-密码统一写在 `secret.json` 文件中，p12 文件的密码也从其中获取。
-
-**Import p12 file into system keychain.**
-
-使用 `security` 工具将 p12 文件导入到系统钥匙串中，先打开系统钥匙串并提供系统管理员密码，然后再导入。
-
-**Read mobileprovision profile info.**
-
-读取 `.mobileprovision` 文件的信息，并将 uuid 作为它的文件名保存到 `/Users/%s/Library/MobileDevice/Provisioning Profiles/` 目录，完成导入。如果先前已经导入过该类文件（一般双击文件导入），打开这个目录可以看到，文件名都是 uuid。这里，除了 uuid 之外，还可以读取团队 id、名称以及文件类型（debug, ad-hoc, enterprise, appstore）等信息。
-
-为了读取方便，使用一个第三方命令行工具。
-
-`curl https://raw.githubusercontent.com/0xc010d/mobileprovision-read/master/main.m | clang -framework Foundation -framework Security -o /usr/local/bin/mobileprovision-read -x objective-c - `
-
-使用 curl 工具下载源码，然后使用 clang 编译并将可执行文件输出到 `/usr/local/bin/` 目录，命名为 `mobileprovision-read`，用法
-
-`mobileprovision-read -f fileName [-o option]`
-
-该工具实现也比较简单，源码如下：
-
-```
-#import <Foundation/Foundation.h>
-#import <Security/Security.h>
- 
-int main(int argc, const char *argv[]) {
-    NSUserDefaults *arguments = [NSUserDefaults standardUserDefaults];
-    NSString *file = [arguments stringForKey:@"f"];
-    NSString *option = [arguments stringForKey:@"o"];
- 
-    if (!file) {
-        printf("\
-\033[1m%1$s\033[0m -- mobileprovision files querying tool.\n\
-\n\
-\033[1mUSAGE\033[0m\n\
-\033[1m%1$s\033[0m \033[1m-f\033[0m \033[4mfileName\033[0m [\033[1m-o\033[0m \033[4moption\033[0m]\n\n\
-\033[1mOPTIONS\033[0m\n\
-    \033[1mtype\033[0m – prints mobileprovision profile type (debug, ad-hoc, enterprise, appstore)\n\
-    \033[1mappid\033[0m – prints application identifier\n\
-Will print raw provision's plist if option is not specified.\n\
-You can also use \033[1mkey path\033[0m as an option.\n\
-\n\
-\033[1mEXAMPLES\033[0m\n\
-%1$s -f test.mobileprovision -o type\n\
-    Prints profile type\n\
-\n\
-%1$s -f test.mobileprovision -o UUID\n\
-    Prints profile UUID\n\
-\n\
-%1$s -f test.mobileprovision -o ProvisionedDevices\n\
-    Prints provisioned devices UDIDs\n\
-\n\
-%1$s -f test.mobileprovision -o Entitlements.get-task-allow\n\
-    Prints 0 if profile doesn't allow debugging 1 otherwise\n\
-", argv[0]);
-        return 1001;
-    }
- 
-    CMSDecoderRef decoder = NULL;
-    CFDataRef dataRef = NULL;
-    NSString *plistString = nil;
-    NSDictionary *plist = nil;
-
-    @try {
-        CMSDecoderCreate(&decoder);
-        NSData *fileData = [NSData dataWithContentsOfFile:file];
-        CMSDecoderUpdateMessage(decoder, fileData.bytes, fileData.length);
-        CMSDecoderFinalizeMessage(decoder);
-        CMSDecoderCopyContent(decoder, &dataRef);
-        plistString = [[[NSString alloc] initWithData:(NSData *)dataRef encoding:NSUTF8StringEncoding] autorelease];
-        plist = [plistString propertyList];
-    }
-    @catch (NSException *exception) {
-        printf("Could not decode file.\n");
-    }
-    @finally {
-        if (decoder) CFRelease(decoder);
-        if (dataRef) CFRelease(dataRef);
-    }
- 
-    if (!option) {
-        printf("%s", [plistString UTF8String]);
-    }
-    if ([option isEqualToString:@"type"]) {
-        if ([plist valueForKeyPath:@"ProvisionedDevices"]){
-            if ([[plist valueForKeyPath:@"Entitlements.get-task-allow"] boolValue]) {
-                printf("debug\n");
-            }
-            else {
-                printf("ad-hoc\n");
-            }
-        }
-        else if ([[plist valueForKeyPath:@"ProvisionsAllDevices"] boolValue]) {
-                printf("enterprise\n");
-        }
-        else {
-                printf("appstore\n");
-        }
-    }
-    else if ([option isEqualToString:@"appid"]) {
-        NSString *applicationIdentifier = [plist valueForKeyPath:@"Entitlements.application-identifier"];
-        NSString *prefix = [[[plist valueForKeyPath:@"ApplicationIdentifierPrefix"] objectAtIndex:0] stringByAppendingString:@"."];
-        printf("%s\n", [[applicationIdentifier stringByReplacingOccurrencesOfString:prefix withString:@""] UTF8String]);
-    }
-    else {
-        id result = [plist valueForKeyPath:option];
-        if (result) {
-            if ([result isKindOfClass:[NSArray class]] && [result count]) {
-                printf("%s\n", [[result componentsJoinedByString:@"\n"] UTF8String]);
-            }
-            else {
-                printf("%s\n", [[result description] UTF8String]);
-            }
-        }
-    }
-
-    return 0;
-}
-```
-
-因为笔者没有对源码进行修改，所以需要对输出结果中的控制字符 `\n` 进行处理，这也是 `removeControlChars` 函数的作用。
-
-### 编译打包
-
-**Build**
-
-编译源码。以前在苹果线上开发者文档可以查看 `xcodebuild` 用法，不知道什么时候删掉了，现在只能使用 `man xcodebuild` 查看 `xcodebuild` 用法，这个不多说。需要注意的是，刚才只是导入了 `.mobileprovision` 文件，工程配置并没有修改，所以没有关联起来。在 `project.pbxproj` 文件中有以下几个字段需要进行替换，替换完之后才算完成整个工程编译变量的配置。
-
-```
-PRODUCT_BUNDLE_IDENTIFIER
-PROVISIONING_PROFILE_SPECIFIER
-PROVISIONING_PROFILE
-```
-
-可以在命令行传入这几个编译变量完成替换，传入的变量优先级最高。
-
-*`project.pbxproj` 不是常见的文件格式，在不知道 xcodebuild 可以注入编译变量之前，找了一圈发现没有方便的工具可以用来编辑。有人建议先转成 json 然后再使用 json 编辑工具进行修改。笔者没有采纳，笔者想到用 sed，但 sed 只对简单的文本内容有效，这种嵌套层级太多的内容貌似匹配不了，所以，无法进行修改。awk 应该可以，但这个我没有尝试。*
-
-**Create 'exportOptions.plist' file and export ipa.**
-
-创建 `exportOptions.plist` 文件并导出 `.ipa ` 安装包。把生成的 `.ipa` 文件路径输出给 java 进程，然后显示在界面上，方便客户端进行下载。
-
-> 注意：
-> Python 脚本没有执行权限，需要使用 chmod 命令添加权限。
-
-至此结束。
-
-[Chmod](https://zh.wikipedia.org/wiki/Chmod)
