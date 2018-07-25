@@ -210,7 +210,9 @@ copyFile(provisionFilePath, desProvisionFilePath)
 
 为了方便读取 `.mobileprovision` 文件信息，这里使用一个第三方命令行小工具。安装命令如下：
 
-`curl https://raw.githubusercontent.com/0xc010d/mobileprovision-read/master/main.m | clang -framework Foundation -framework Security -o /usr/local/bin/mobileprovision-read -x objective-c - `
+```
+curl https://raw.githubusercontent.com/0xc010d/mobileprovision-read/master/main.m | clang -framework Foundation -framework Security -o /usr/local/bin/mobileprovision-read -x objective-c - 
+```
 
 安装命令会使用 curl 工具下载源码，然后使用 clang 编译并将可执行文件输出到 `/usr/local/bin/` 目录，命名为 `mobileprovision-read`，用法：
 
